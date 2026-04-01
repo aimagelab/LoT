@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Look Twice (LoT) – Training-Free Evidence Highlighting in MLLMs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300;1,9..40,400&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Base ────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #ffffff;
+      --surface:  #f8f8f6;
+      --border:   #e8e6e0;
+      --text:     #1a1a18;
+      --muted:    #6b6b65;
+      --accent:   #efd2e0;
+      --accent2:  #2c3e50;
+      --tag-bg:   #f0ede8;
+      --tag-text: #3a3a35;
+      --radius:   10px;
+      --shadow:   0 2px 16px rgba(0,0,0,0.07);
+      --shadow-lg:0 8px 40px rgba(0,0,0,0.10);
+      --max-w:    960px;
+      --font-serif: 'DM Serif Display', Georgia, serif;
+      --font-sans:  'DM Sans', system-ui, sans-serif;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 16px;
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    img { max-width: 100%; display: block; }
+    strong { font-weight: 600; }
+
+    /* ── Nav ─────────────────────────────────────────── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+    }
+    .nav-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 54px;
+      gap: 1.5rem;
+    }
+    .nav-logo {
+      font-family: var(--font-serif);
+      font-size: 1.2rem;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .nav-logo span { color: var(--accent); }
+    .nav-links {
+      display: flex;
+      gap: 1.4rem;
+      list-style: none;
+      flex-wrap: wrap;
+    }
+    .nav-links a {
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+    /* ── Hero ────────────────────────────────────────── */
+    .hero {
+      padding: 5rem 2rem 3.5rem;
+      text-align: center;
+      max-width: var(--max-w);
+      margin: 0 auto;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--tag-bg);
+      color: var(--tag-text);
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.9rem;
+      border-radius: 50px;
+      margin-bottom: 1.6rem;
+    }
+    .badge::before {
+      content: '';
+      display: inline-block;
+      width: 7px; height: 7px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(2rem, 4.5vw, 3rem);
+      line-height: 1.2;
+      color: var(--text);
+      margin-bottom: 1rem;
+      font-weight: 400;
+    }
+    h1 em { color: var(--accent); font-style: italic; }
+    .tagline {
+      font-size: 1.08rem;
+      color: var(--muted);
+      max-width: 640px;
+      margin: 0 auto 2.2rem;
+      line-height: 1.6;
+    }
+    .authors {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem 1.2rem;
+      justify-content: center;
+      margin-bottom: 0.6rem;
+    }
+    .author {
+      font-size: 0.97rem;
+      font-weight: 500;
+      color: var(--text);
+    }
+    .affil {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 2rem;
+    }
+    .btn-group {
+      display: flex;
+      gap: 0.7rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.55rem 1.3rem;
+      border-radius: 50px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      transition: all 0.2s;
+      border: 1.5px solid transparent;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .btn-primary:hover { background: #e3b5c8; border-color: #e3b5c8; text-decoration: none; }
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+
+    /* ── Divider ─────────────────────────────────────── */
+    .divider {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── Sections ────────────────────────────────────── */
+    section {
+      padding: 4rem 2rem;
+      max-width: var(--max-w);
+      margin: 0 auto;
+    }
+    .section-label {
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+    h2 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      font-weight: 400;
+      color: var(--text);
+      margin-bottom: 1.2rem;
+      line-height: 1.25;
+    }
+    .prose {
+      color: #3a3a38;
+      max-width: 720px;
+      font-size: 1rem;
+      line-height: 1.75;
+    }
+    .prose p + p { margin-top: 1em; }
+
+    /* ── Teaser image ────────────────────────────────── */
+    .teaser {
+      margin: 2.5rem auto 0;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-lg);
+      background: var(--surface);
+    }
+    .img-placeholder {
+      width: 100%;
+      background: var(--surface);
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-weight: 500;
+      min-height: 280px;
+    }
+    .img-placeholder svg { opacity: 0.35; }
+    .img-caption {
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 0.9rem;
+      font-style: italic;
+    }
+
+    /* ── Stats bar ───────────────────────────────────── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-top: 3rem;
+    }
+    .stat {
+      background: var(--bg);
+      padding: 1.5rem 1.2rem;
+      text-align: center;
+    }
+    .stat-val {
+      font-family: var(--font-serif);
+      font-size: 2rem;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 0.3rem;
+    }
+    .stat-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.3;
+    }
+
+    /* ── Two-pass pipeline ───────────────────────────── */
+    .pipeline {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 2.5rem;
+    }
+    @media (max-width: 640px) { .pipeline { grid-template-columns: 1fr; } }
+    .pipe-step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.6rem;
+      position: relative;
+    }
+    .pipe-num {
+      font-family: var(--font-serif);
+      font-size: 3rem;
+      color: var(--border);
+      position: absolute;
+      top: 0.5rem; right: 1rem;
+      line-height: 1;
+      user-select: none;
+    }
+    .pipe-step h3 {
+      font-size: 0.92rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      margin-bottom: 0.5rem;
+      color: var(--text);
+    }
+    .pipe-step p {
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .pipe-tag {
+      display: inline-block;
+      background: var(--tag-bg);
+      color: var(--accent);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 0.15rem 0.55rem;
+      border-radius: 4px;
+      margin-bottom: 0.6rem;
+    }
+
+    /* ── Method figure full ──────────────────────────── */
+    .full-fig {
+      margin: 2.5rem 0 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      background: var(--surface);
+    }
+
+    /* ── Component cards (ablation highlights) ───────── */
+    .components {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    @media (max-width: 560px) { .components { grid-template-columns: 1fr; } }
+    .comp-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.4rem 1.4rem 1.2rem;
+      background: var(--bg);
+      transition: box-shadow 0.2s, border-color 0.2s;
+    }
+    .comp-card:hover { box-shadow: var(--shadow); border-color: #ccc; }
+    .comp-icon {
+      font-size: 1.4rem;
+      margin-bottom: 0.6rem;
+    }
+    .comp-card h3 {
+      font-size: 0.93rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+    }
+    .comp-card p {
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    /* ── Results table ───────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto;
+      margin-top: 2rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+    }
+    thead th {
+      background: var(--surface);
+      padding: 0.75rem 1rem;
+      font-size: 0.72rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody td {
+      padding: 0.65rem 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: var(--surface); }
+    .row-lot td { background: #fef9f8; }
+    .row-lot td:first-child { border-left: 3px solid var(--accent); padding-left: calc(1rem - 3px); }
+    .delta {
+      display: inline-block;
+      background: #edfaf2;
+      color: #1a7a3a;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.1rem 0.45rem;
+      border-radius: 4px;
+    }
+
+    /* ── Qualitative grid ────────────────────────────── */
+    .qual-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+      margin-top: 2rem;
+    }
+    @media (max-width: 600px) { .qual-grid { grid-template-columns: 1fr; } }
+    .qual-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .qual-card .img-placeholder { min-height: 200px; border-radius: 0; border: none; border-bottom: 1px solid var(--border); }
+    .qual-card-body { padding: 0.9rem 1rem; }
+    .qual-card-body p { font-size: 0.82rem; color: var(--muted); }
+
+    /* ── BibTeX ──────────────────────────────────────── */
+    .bibtex-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.6rem 1.8rem;
+      margin-top: 1.8rem;
+      position: relative;
+    }
+    pre {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 0.8rem;
+      line-height: 1.8;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 1rem; right: 1rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.3rem 0.75rem;
+      font-size: 0.75rem;
+      font-family: var(--font-sans);
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Footer ──────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 2rem;
+      text-align: center;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--accent); }
+
+    /* ── Scroll-in animations ────────────────────────── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(22px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    .reveal.visible { opacity: 1; transform: none; }
+
+    /* ── Responsive ──────────────────────────────────── */
+    @media (max-width: 680px) {
+      .nav-links { display: none; }
+      h1 { font-size: 1.75rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Navigation ──────────────────────────────────────── -->
+<nav>
+  <div class="nav-inner">
+    <span class="nav-logo">Look <span>Twice</span></span>
+    <ul class="nav-links">
+      <li><a href="#abstract">Abstract</a></li>
+      <li><a href="#method">Method</a></li>
+      <li><a href="#results">Results</a></li>
+      <li><a href="#qualitative">Qualitative</a></li>
+      <li><a href="#bibtex">BibTeX</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- ── Hero ────────────────────────────────────────────── -->
+<header class="hero">
+  <!-- <div class="badge">ECCV 2026 · Under Review</div> -->
+  <h1>Look Twice: Training-Free<br><em>Evidence Highlighting</em><br>in Multimodal Large Language Models</h1>
+  <p class="tagline">A lightweight inference-time framework that improves how pretrained MLLMs utilize multimodal evidence — no fine-tuning, no architectural changes.</p>
+
+  <div class="authors">
+    <span class="author">Marco Morini</span>
+    <span class="author">Sara Sarto</span>
+    <span class="author">Marcella Cornia</span>
+    <span class="author">Lorenzo Baraldi</span>
+  </div>
+  <p class="affil">University of Modena and Reggio Emilia</p>
+
+  <div class="btn-group">
+    <a href="https://arxiv.org/abs/XXXX.XXXXX" class="btn btn-primary">
+      <!-- arxiv icon -->
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+      arXiv Paper
+    </a>
+    <a href="https://github.com/aimagelab/LoT" class="btn btn-outline">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/></svg>
+      GitHub Code
+    </a>
+    <a href="https://aimagelab.ing.unimore.it/" class="btn btn-outline">AImageLab</a>
+  </div>
+</header>
+
+<div class="divider"></div>
+
+<!-- ── Abstract ─────────────────────────────────────────── -->
+<section id="abstract">
+  <div class="section-label">Abstract</div>
+  <h2>From noisy evidence to precise answers</h2>
+  <div class="prose">
+    <p>Answering questions about images often requires combining visual understanding with external knowledge. Multimodal Large Language Models (MLLMs) provide a natural framework for this setting, but they often <strong>struggle to identify the most relevant visual and textual evidence</strong> when answering knowledge-intensive queries.</p>
+    <p>In such scenarios, models must integrate visual cues with retrieved textual evidence that is often noisy or only partially relevant, while also localizing fine-grained visual information in the image. We introduce <strong>Look Twice (LoT)</strong>, a training-free inference-time framework that improves how pretrained MLLMs utilize multimodal evidence.</p>
+    <p>We exploit the model attention patterns to estimate which visual regions and retrieved textual elements are relevant to a query, then generate the answer conditioned on this highlighted evidence. The selected cues are highlighted through <strong>lightweight prompt-level markers</strong> that encourage the model to re-attend to the relevant evidence during generation — with negligible computational overhead.</p>
+  </div>
+
+  <!-- Teaser placeholder -->
+  <div class="teaser reveal">
+    <div class="img-placeholder" style="min-height:360px;">
+      <!-- <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+      <span>Placeholder — insert teaser figure here (e.g., Fig. 1 from the paper)</span>
+      <span style="font-size:0.75rem; opacity:0.7;">Recommended: images/teaser.png · ~1200×500 px</span> -->
+      <img src="images/03_qualitatives-1.png" alt="Teaser figure illustrating the Look Twice (LoT) framework" />
+    </div>
+  </div>
+  <p class="img-caption">Figure 1. Look Twice (LoT): a two-pass inference strategy that highlights query-relevant visual regions and textual evidence to improve multimodal reasoning.</p>
+
+  <!-- Stats bar -->
+  <div class="stats reveal">
+    <div class="stat">
+      <div class="stat-val">+5.3</div>
+      <div class="stat-label">Max avg. gain on KB-VQA benchmarks</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val">0</div>
+      <div class="stat-label">Additional training or fine-tuning</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val">+1</div>
+      <div class="stat-label">Single extra token in first pass</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val">10</div>
+      <div class="stat-label">Models evaluated across 3 scales</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ── Method ───────────────────────────────────────────── -->
+<section id="method">
+  <div class="section-label">Method</div>
+  <h2>A two-pass inference strategy</h2>
+  <div class="prose">
+    <p>LoT operates entirely at inference time. The model looks at the input twice: a first lightweight generation step produces a single token, used to inspect internal attention patterns. A second generation pass produces the final answer conditioned on highlighted evidence.</p>
+  </div>
+
+  <div class="pipeline reveal">
+    <div class="pipe-step">
+      <span class="pipe-num">01</span>
+      <div class="pipe-tag">First pass</div>
+      <h3>Attention Analysis</h3>
+      <p>Generate a single token to read the model's internal attention patterns. Extract object-to-visual attention to locate relevant image regions, and last-to-context attention to score retrieved sentences.</p>
+    </div>
+    <div class="pipe-step">
+      <span class="pipe-num">02</span>
+      <div class="pipe-tag">Filtering</div>
+      <h3>Attention Sink Filtering</h3>
+      <p>Identify and suppress spurious visual tokens acting as attention sinks — tokens that attract disproportionate attention regardless of semantic relevance — using hidden-state activation statistics.</p>
+    </div>
+    <div class="pipe-step">
+      <span class="pipe-num">03</span>
+      <div class="pipe-tag">Localization</div>
+      <h3>Visual Evidence Selection</h3>
+      <p>Aggregate filtered attention into a 2D map and extract a bounding box via weighted centroid and spread. The cropped region is inserted into the prompt with special markers.</p>
+    </div>
+    <div class="pipe-step">
+      <span class="pipe-num">04</span>
+      <div class="pipe-tag">Second pass</div>
+      <h3>Highlighted Generation</h3>
+      <p>The final answer is generated with the original image replaced by the cropped evidence and the most relevant retrieved sentence wrapped in importance markers, guiding the model's attention.</p>
+    </div>
+  </div>
+
+  <!-- Method figure placeholder -->
+  <div class="full-fig reveal">
+    <div class="img-placeholder" style="min-height:320px; border-radius:0; border:none;">
+      <!-- <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+      <span>Placeholder — insert method overview figure (Fig. 1 from paper)</span>
+      <span style="font-size:0.75rem; opacity:0.7;">Recommended: images/method.png · ~1200×600 px</span> -->
+      <img src="images/00_first-1.png" alt="Overview of the LoT pipeline" />
+    </div>
+  </div>
+  <p class="img-caption">Figure 2. Overview of the LoT pipeline, showing textual evidence selection (attention matrix → sentence highlighting) and visual evidence selection (sink filtering → bounding box extraction).</p>
+
+  <!-- Components -->
+  <div style="margin-top:3rem;">
+    <div class="section-label">Components</div>
+    <h2>What makes LoT work</h2>
+  </div>
+  <div class="components reveal">
+    <div class="comp-card">
+      <div class="comp-icon">🔍</div>
+      <h3>Self-Guided Visual Evidence</h3>
+      <p>Object-conditioned attention between question tokens and visual tokens produces a query-specific relevance map, explicitly capturing how the queried object interacts with the visual input.</p>
+    </div>
+    <div class="comp-card">
+      <div class="comp-icon">🚫</div>
+      <h3>Attention Sink Filtering</h3>
+      <p>Tokens with disproportionately high hidden-state activations in sink dimensions (identified from the base LLM) are suppressed, yielding cleaner grounding maps without modifying the model.</p>
+    </div>
+    <div class="comp-card">
+      <div class="comp-icon">📦</div>
+      <h3>Weighted Centroid Bounding Box</h3>
+      <p>The attention map is converted into a precise spatial region by computing the attention-weighted centroid and standard deviation, outperforming min-max and morphological alternatives.</p>
+    </div>
+    <div class="comp-card">
+      <div class="comp-icon">📝</div>
+      <h3>Self-Guided Textual Evidence</h3>
+      <p>Last-token-to-context attention aggregated across deep decoder layers identifies the single most relevant retrieved sentence, which is wrapped with importance markers during generation.</p>
+    </div>
+  </div>
+
+  <!-- Attention map filtering figure placeholder -->
+  <div style="margin-top:2.5rem;" class="reveal">
+    <div class="img-placeholder" style="min-height:260px;">
+      <!-- <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+      <span>Placeholder — attention map filtering figure (Fig. 2 from paper)</span>
+      <span style="font-size:0.75rem; opacity:0.7;">Recommended: images/filtering.png · ~1100×380 px</span> -->
+      <img src="images/01_fig-1.png" alt="Qualitative examples of attention sink filtering, showing raw and filtered attention maps" />
+    </div>
+    <p class="img-caption">Figure 3. Qualitative examples of attention sink filtering. Raw maps (center) contain scattered activations; filtered maps (right) are tightly concentrated around the target object.</p>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ── Results ───────────────────────────────────────────── -->
+<section id="results">
+  <div class="section-label">Results</div>
+  <h2>Consistent gains across models &amp; benchmarks</h2>
+  <div class="prose">
+    <p>LoT is evaluated on four KB-VQA benchmarks (E-VQA, InfoSeek, OVEN, ViQuAE) across ten off-the-shelf MLLMs in a zero-shot setting. Gains range from <strong>+1.1 to +5.3 average accuracy</strong> depending on the backbone, with no additional training.</p>
+  </div>
+
+  <!-- Results table (excerpt – key models) -->
+  <div class="table-wrap reveal">
+    <table>
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>E-VQA All</th>
+          <th>InfoSeek All</th>
+          <th>OVEN All</th>
+          <th>ViQuAE</th>
+          <th>Avg</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td colspan="6" style="font-size:0.72rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted);padding:0.5rem 1rem;background:var(--surface);">Small Models</td></tr>
+        <tr><td>Qwen2.5-VL-3B</td><td>27.8</td><td>22.4</td><td>11.5</td><td>22.9</td><td>21.2</td></tr>
+        <tr class="row-lot"><td><strong>+ LoT (Ours)</strong></td><td>30.4</td><td>25.2</td><td>18.3</td><td>27.8</td><td>25.5 <span class="delta">+4.3</span></td></tr>
+        <tr><td>InternVL3.5-4B</td><td>26.2</td><td>28.9</td><td>10.8</td><td>36.4</td><td>25.6</td></tr>
+        <tr class="row-lot"><td><strong>+ LoT (Ours)</strong></td><td>28.7</td><td>33.2</td><td>11.5</td><td>45.6</td><td>29.8 <span class="delta">+4.2</span></td></tr>
+        <tr><td colspan="6" style="font-size:0.72rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted);padding:0.5rem 1rem;background:var(--surface);">Medium Models</td></tr>
+        <tr><td>Qwen2-VL-7B</td><td>22.9</td><td>24.4</td><td>11.1</td><td>33.0</td><td>22.9</td></tr>
+        <tr class="row-lot"><td><strong>+ LoT (Ours)</strong></td><td>25.6</td><td>29.9</td><td>16.6</td><td>40.8</td><td>28.2 <span class="delta">+5.3</span></td></tr>
+        <tr><td>Qwen3-VL-8B</td><td>35.0</td><td>29.7</td><td>17.7</td><td>43.7</td><td>31.5</td></tr>
+        <tr class="row-lot"><td><strong>+ LoT (Ours)</strong></td><td>36.4</td><td>32.8</td><td>19.6</td><td>51.0</td><td>35.0 <span class="delta">+3.5</span></td></tr>
+        <tr><td colspan="6" style="font-size:0.72rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted);padding:0.5rem 1rem;background:var(--surface);">Large Models</td></tr>
+        <tr><td>InternVL3.5-38B</td><td>31.6</td><td>33.1</td><td>20.2</td><td>51.5</td><td>34.1</td></tr>
+        <tr class="row-lot"><td><strong>+ LoT (Ours)</strong></td><td>33.5</td><td>36.8</td><td>18.5</td><td>61.0</td><td>37.5 <span class="delta">+3.1</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="img-caption">Table 1. Performance on KB-VQA benchmarks. LoT consistently improves all backbones without any training.</p>
+
+  <!-- Results chart placeholder -->
+  <div style="margin-top:2rem;" class="reveal">
+    <div class="img-placeholder" style="min-height:260px;">
+      <!-- <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+      <span>Placeholder — bar chart / ablation figure (Fig. 4 from paper)</span>
+      <span style="font-size:0.75rem; opacity:0.7;">Recommended: images/ablation.png · ~900×340 px</span> -->
+      <img src="images/04_abl_combined-1.png" alt="Bar charts showing LoT performance as the number of retrieved passages varies and with oracle evidence" />
+    </div>
+    <p class="img-caption">Figure 4. Performance on E-VQA as the number of retrieved passages varies (left) and with oracle evidence (right). LoT consistently outperforms zero-shot baselines in all settings.</p>
+  </div>
+
+  <!-- Generalization section -->
+  <div style="margin-top:3.5rem;">
+    <div class="section-label">Generalization</div>
+    <h2>Visual highlighting alone helps general MLLMs</h2>
+    <div class="prose">
+      <p>When applied with only visual cues (no retrieved text), LoT still improves performance on <strong>vision-centric</strong> (RealWorldQA, V-Star), <strong>OCR</strong> (TextVQA, OCRBench, ChartQA), and <strong>hallucination</strong> benchmarks (POPE, AMBER-D), demonstrating that improved visual grounding benefits multimodal reasoning broadly.</p>
+    </div>
+  </div>
+</section>
+
+<!-- <div class="divider"></div> -->
+
+<!-- ── Qualitative ───────────────────────────────────────── -->
+<section id="qualitative">
+  <!-- <div class="section-label">Qualitative Results</div>
+  <h2>Seeing what matters</h2>
+  <div class="prose">
+    <p>LoT reliably identifies the precise image region containing the object referenced in the question and highlights the retrieved sentence that directly provides the answer.</p>
+  </div>
+
+  <div class="qual-grid reveal">
+    <div class="qual-card">
+      <div class="img-placeholder">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        <span style="font-size:0.75rem;">images/qual_1.png</span>
+      </div>
+      <div class="qual-card-body">
+        <p><strong>Q:</strong> What color are the undersides of this female butterfly's wings?<br><strong>LoT:</strong> Yellowish with black speckles ✓</p>
+      </div>
+    </div>
+    <div class="qual-card">
+      <div class="img-placeholder">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        <span style="font-size:0.75rem;">images/qual_2.png</span>
+      </div>
+      <div class="qual-card-body">
+        <p><strong>Q:</strong> Which animals eat the fruits / leaves of this plant?<br><strong>LoT:</strong> Bees, hummingbirds, and lepidoptera ✓</p>
+      </div>
+    </div>
+    <div class="qual-card">
+      <div class="img-placeholder">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        <span style="font-size:0.75rem;">images/qual_3.png</span>
+      </div>
+      <div class="qual-card-body">
+        <p><strong>Q:</strong> Where is this insect native?<br><strong>LoT:</strong> Brazil to central Mexico ✓</p>
+      </div>
+    </div>
+    <div class="qual-card">
+      <div class="img-placeholder">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        <span style="font-size:0.75rem;">images/qual_4.png</span>
+      </div>
+      <div class="qual-card-body">
+        <p><strong>Q:</strong> After what or who was this species named?<br><strong>LoT:</strong> John Edwards Holbrook ✓</p>
+      </div>
+    </div>
+  </div>
+  <p class="img-caption">Figure 5. LoT correctly localizes the relevant image region (red bounding box) and highlights the evidence sentence (yellow) that contains the answer.</p> -->
+
+  <!-- Hallucination figure placeholder -->
+  <div style="margin-top:-6rem;" class="reveal">
+    <div class="img-placeholder" style="min-height:220px;">
+      <!-- <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+      <span>Placeholder — hallucination benchmark examples (Fig. 7 from paper)</span>
+      <span style="font-size:0.75rem; opacity:0.7;">Recommended: images/hallucination.png · ~1100×400 px</span> -->
+      <img src="images/06_hall_qualitatives_cropped (1)-1.png" alt="Qualitative examples of LoT on hallucination benchmarks, showing improved grounding and correct answers" />
+    </div>
+    <p class="img-caption">Figure 6. LoT on POPE and AMBER: visual grounding guides the model toward the correct yes/no answer about object presence.</p>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ── BibTeX ────────────────────────────────────────────── -->
+<section id="bibtex">
+  <div class="section-label">Citation</div>
+  <h2>BibTeX</h2>
+  <div class="bibtex-block">
+    <button class="copy-btn" onclick="copyBib()">Copy</button>
+    <pre id="bibtex-text">@article{morini2026looktwice,
+  title   = {{Look Twice: Training-Free Evidence Highlighting in Multimodal Large Language Models}},
+  author  = {Morini, Marco and Sarto, Sara and Cornia, Marcella and Baraldi, Lorenzo},
+  journal = {arXiv preprint arXiv:XXXX.XXXXX},
+  year    = {2026}
+}</pre>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ── Footer ────────────────────────────────────────────── -->
+<footer>
+  <p>
+    <a href="https://aimagelab.ing.unimore.it/">AImageLab</a> ·
+    University of Modena and Reggio Emilia
+  </p>
+  <p style="margin-top:0.4rem;">
+    This work was supported by the EU Horizon project ELLIOT (No. 101214398)
+    and the EuroHPC JU project MINERVA (GA No. 101182737).
+  </p>
+</footer>
+
+<!-- ── Scripts ───────────────────────────────────────────── -->
+<script>
+  // Scroll reveal
+  const revealEls = document.querySelectorAll('.reveal');
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+  }, { threshold: 0.08 });
+  revealEls.forEach(el => obs.observe(el));
+
+  // Copy BibTeX
+  function copyBib() {
+    const text = document.getElementById('bibtex-text').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.querySelector('.copy-btn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 2000);
+    });
+  }
+</script>
+
+</body>
+</html>
